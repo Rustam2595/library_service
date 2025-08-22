@@ -1,5 +1,7 @@
 package server
 
+import "github.com/gin-gonic/gin"
+
 type Server struct {
 	Host   string
 	Router *gin.Engine
@@ -22,7 +24,8 @@ func New(host string) *Server {
 	}
 	return &Server{
 		Host:   host,
-		Router: r}
+		Router: r,
+	}
 }
 func (s *Server) Run() error {
 	if err := s.Router.Run(s.Host); err != nil {
