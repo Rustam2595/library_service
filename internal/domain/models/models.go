@@ -1,13 +1,21 @@
 package models
 
 type User struct {
-	Name  string `json: "name" validate:"required"`
-	Emaim string `json: "email" validate:"required, email"`
-	Pass  string `json: "pass" validate:"required"`
+	UID   string `json:"uid"`
+	Name  string `json:"name" validate:"required"`
+	Email string `json:"email" validate:"required, email"`
+	Pass  string `json:"pass" validate:"required"`
 }
 
 type Book struct {
-	BID    string `json: "bid" validate:"required"`
-	Lable  string `json: "label" validate:"required"`
-	Author string `json: "author" validate:"required"`
+	BID    string `json:"bid"`
+	Label  string `json:"label" validate:"required"`
+	Author string `json:"author" validate:"required"`
 }
+
+//	SaveUser(models.User) error
+//	ValidateUser(models.User) (string, error)
+//	GetBooks() ([]models.Book, error)
+//	GetBookById(string) (models.Book, error)
+//	SaveBook(models.Book) error
+//	DeleteBook(string) error
