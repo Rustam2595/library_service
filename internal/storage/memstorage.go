@@ -46,7 +46,20 @@ func (ms *MemStorage) GetUsers() ([]models.User, error) {
 	}
 	return users, nil
 }
-
+func (ms *MemStorage) UpdateUser(uid string, user models.User) error {
+	if _, ok := ms.UsersMap[uid]; !ok {
+		return ErrUserNotFound
+	}
+	ms.UsersMap[uid] = user
+	return nil
+}
+func (ms *MemStorage) DeleteUser(uid string) error {
+	if _, ok := ms.UsersMap[uid]; !ok {
+		return ErrUserNotFound
+	}
+	delete(ms.UsersMap, uid)
+	return nil
+}
 func (ms *MemStorage) GetBooks() ([]models.Book, error) {
 	var books []models.Book
 	for bid, e := range ms.BooksMap {
@@ -63,7 +76,6 @@ func (ms *MemStorage) GetBookById(bid string) (models.Book, error) {
 	if book, ok := ms.BooksMap[bid]; ok {
 		book.BID = bid
 		return book, nil
-
 	}
 	return models.Book{}, ErrBookNotFound
 }

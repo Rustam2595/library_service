@@ -1,6 +1,10 @@
 package config
 
-import "flag"
+import (
+	"flag"
+	"log"
+	"os"
+)
 
 type Config struct {
 	Host  string
@@ -12,6 +16,11 @@ func ReadConfig() Config {
 	flag.StringVar(&host, "host", ":8080", "server host")
 	debug := flag.Bool("debug", false, "enable debug logging lvl")
 	flag.Parse()
+	hostEnv := os.Getenv("SERVER_HOST") //хост взяли из переменной окружения (echo $SERVER_HOST)
+	if hostEnv != "" && host == ":8080" {
+		host = hostEnv
+	}
+	log.Println("host: ", host)
 	return Config{
 		Host:  host,
 		Debug: *debug,

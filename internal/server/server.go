@@ -5,6 +5,7 @@ import (
 	"github.com/Rustam2595/library_service/internal/domain/models"
 	"github.com/Rustam2595/library_service/internal/storage"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"net/http"
 )
 
@@ -12,6 +13,8 @@ type Storage interface {
 	SaveUser(models.User) error
 	ValidateUser(models.User) (string, error)
 	GetUsers() ([]models.User, error)
+	UpdateUser(string, models.User) error
+	DeleteUser(string) error
 	GetBooks() ([]models.Book, error)
 	GetBookById(string) (models.Book, error)
 	SaveBook(models.Book) error
@@ -37,6 +40,8 @@ func (s *Server) Run() error {
 		userGroup.POST("/register", s.RegisterHandler)
 		userGroup.POST("/auth", s.AuthHandler)
 		userGroup.GET("/get_all_users", s.AllUsersHandler)
+		userGroup.PUT("/update_user/:id", s.UpdateUserHandler)
+		userGroup.DELETE("/delete/:id", s.DeleteUserHandler)
 	}
 	bookGroup := r.Group("/book")
 	{
@@ -57,8 +62,14 @@ func (s *Server) RegisterHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	val := validator.New()
+	if err := val.Struct(user); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	if err := s.storage.SaveUser(user); err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "User successfully registered"})
 }
@@ -66,6 +77,11 @@ func (s *Server) RegisterHandler(ctx *gin.Context) {
 func (s *Server) AuthHandler(ctx *gin.Context) {
 	var user models.User
 	if err := ctx.ShouldBindBodyWithJSON(&user); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	val := validator.New()
+	if err := val.Struct(user); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -79,6 +95,7 @@ func (s *Server) AuthHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
 	ctx.JSON(http.StatusOK, gin.H{"message": "User successfully registered, uuid = " + uid})
 }
 
@@ -93,6 +110,36 @@ func (s *Server) AllUsersHandler(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, users)
+}
+func (s *Server) UpdateUserHandler(ctx *gin.Context) {
+	var user models.User
+	uid := ctx.Param("id")
+	if err := ctx.ShouldBindBodyWithJSON(&user); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := s.storage.UpdateUser(uid, user); err != nil {
+		if errors.Is(err, storage.ErrUserNotFound) {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"message": "User successfully updated"})
+}
+
+func (s *Server) DeleteUserHandler(ctx *gin.Context) {
+	uid := ctx.Param("id")
+	if err := s.storage.DeleteUser(uid); err != nil {
+		if errors.Is(err, storage.ErrUserNotFound) {
+			ctx.JSON(http.StatusNoContent, err.Error())
+			return
+		}
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"message": "User successfully deleted"})
 }
 
 func (s *Server) AllBooksHandler(ctx *gin.Context) {
@@ -128,6 +175,11 @@ func (s *Server) SaveBookHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	val := validator.New()
+	if err := val.Struct(book); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	if err := s.storage.SaveBook(book); err != nil {
 		//if errors.Is(err, storage.ErrInvalidAuthData) {
 		//	ctx.JSON(http.StatusNoContent, gin.H{"error": err.Error()})
@@ -135,6 +187,7 @@ func (s *Server) SaveBookHandler(ctx *gin.Context) {
 		//}
 		//errors.As()
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	ctx.JSON(http.StatusCreated, gin.H{"message": "Book successfully saved"})
 }
