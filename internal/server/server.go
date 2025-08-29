@@ -11,7 +11,7 @@ import (
 
 type Storage interface {
 	SaveUser(models.User) error
-	ValidateUser(models.User) (string, error)
+	ValidateUser(models.User) (string, string, error)
 	GetUsers() ([]models.User, error)
 	UpdateUser(string, models.User) error
 	DeleteUser(string) error
@@ -85,7 +85,7 @@ func (s *Server) AuthHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	uid, err := s.storage.ValidateUser(user)
+	uid, pass, err := s.storage.ValidateUser(user)
 	if err != nil {
 		if errors.Is(err, storage.ErrInvalidAuthData) {
 			ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
@@ -96,7 +96,7 @@ func (s *Server) AuthHandler(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"message": "User successfully registered, uuid = " + uid})
+	ctx.JSON(http.StatusOK, gin.H{"message": "User successfully registered, uuid = " + uid + pass})
 }
 
 func (s *Server) AllUsersHandler(ctx *gin.Context) {
@@ -181,11 +181,6 @@ func (s *Server) SaveBookHandler(ctx *gin.Context) {
 		return
 	}
 	if err := s.storage.SaveBook(book); err != nil {
-		//if errors.Is(err, storage.ErrInvalidAuthData) {
-		//	ctx.JSON(http.StatusNoContent, gin.H{"error": err.Error()})
-		//	return
-		//}
-		//errors.As()
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

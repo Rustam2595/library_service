@@ -24,16 +24,16 @@ func (ms *MemStorage) SaveUser(user models.User) error {
 	ms.UsersMap[uid] = user
 	return nil
 }
-func (ms *MemStorage) ValidateUser(user models.User) (string, error) {
+func (ms *MemStorage) ValidateUser(user models.User) (string, string, error) {
 	for uid, value := range ms.UsersMap {
 		if value.Email == user.Email {
 			if value.Pass != user.Pass {
-				return "", ErrInvalidAuthData
+				return "", "", ErrInvalidAuthData
 			}
-			return uid, nil
+			return uid, value.Pass, nil
 		}
 	}
-	return "", ErrUserNotFound
+	return "", "", ErrUserNotFound
 }
 func (ms *MemStorage) GetUsers() ([]models.User, error) {
 	var users []models.User
@@ -82,7 +82,6 @@ func (ms *MemStorage) GetBookById(bid string) (models.Book, error) {
 
 func (ms *MemStorage) SaveBook(book models.Book) error {
 	nid := uuid.NewString()
-
 	ms.BooksMap[nid] = book
 	return nil
 }
