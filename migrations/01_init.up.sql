@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS Books(
     author TEXT NOT NULL,
     deleted BOOLEAN NOT NULL DEFAULT false,
     user_uid VARCHAR(36) NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
+    created_at TIMESTAMP DEFAULT NOW() NOT NULL,
     CONSTRAINT fk_books_user FOREIGN KEY (user_uid) REFERENCES Users(uid) ON DELETE CASCADE
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_books_user_uid ON Books (user_uid);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_books_user_uid ON Books (user_uid); --user_uid будет уникальным

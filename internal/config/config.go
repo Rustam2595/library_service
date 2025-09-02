@@ -14,7 +14,7 @@ type Config struct {
 	Debug bool
 }
 
-const ( //"postgres://rustamgalihanov:2595@127.0.0.1:5432/ru_DB?sslmode=disable"
+const (
 	defaultBbDSN       = "postgres://ru:2595@127.0.0.1:5432/ru_DB?sslmode=disable"
 	defaultMigratePath = "migrations"
 	defaultHost        = ":8080"

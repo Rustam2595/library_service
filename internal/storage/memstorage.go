@@ -19,10 +19,10 @@ func New() *MemStorage {
 	}
 }
 
-func (ms *MemStorage) SaveUser(user models.User) error {
+func (ms *MemStorage) SaveUser(user models.User) (string, error) {
 	uid := uuid.NewString()
 	ms.UsersMap[uid] = user
-	return nil
+	return uid, nil
 }
 func (ms *MemStorage) ValidateUser(user models.User) (string, string, error) {
 	for uid, value := range ms.UsersMap {

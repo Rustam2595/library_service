@@ -2,15 +2,28 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"github.com/Rustam2595/library_service/internal/domain/models"
 	"github.com/Rustam2595/library_service/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 	"net/http"
+	"time"
 )
 
+var secretKey = []byte("VerySecretKey2000")
+
+type Claims struct {
+	UserID string //`json:"user_id"`
+	//Username string `json:"username"`
+	//Role     string `json:"role"`
+	jwt.RegisteredClaims
+}
+
 type Storage interface {
-	SaveUser(models.User) error
+	SaveUser(models.User) (string, error)
 	ValidateUser(models.User) (string, string, error)
 	GetUsers() ([]models.User, error)
 	UpdateUser(string, models.User) error
@@ -33,8 +46,8 @@ func New(host string, storage Storage) *Server {
 }
 func (s *Server) Run() error {
 	r := gin.Default()
-	r.Use(gin.Recovery())
-	r.Use(gin.Logger())
+	//r.Use(gin.Recovery())
+	//r.Use(gin.Logger())
 	userGroup := r.Group("/user")
 	{
 		userGroup.POST("/register", s.RegisterHandler)
@@ -62,15 +75,29 @@ func (s *Server) RegisterHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	passHash, err := bcrypt.GenerateFromPassword([]byte(user.Pass), bcrypt.DefaultCost)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	user.Pass = string(passHash)
 	val := validator.New()
 	if err := val.Struct(user); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := s.storage.SaveUser(user); err != nil {
+	uid, err := s.storage.SaveUser(user)
+	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	//add JWT
+	token, err := createJWT(uid)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	ctx.Header("authorization", token)
 	ctx.JSON(http.StatusOK, gin.H{"message": "User successfully registered"})
 }
 
@@ -85,6 +112,7 @@ func (s *Server) AuthHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
 	uid, pass, err := s.storage.ValidateUser(user)
 	if err != nil {
 		if errors.Is(err, storage.ErrInvalidAuthData) {
@@ -96,7 +124,19 @@ func (s *Server) AuthHandler(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"message": "User successfully registered, uuid = " + uid + pass})
+	if err = bcrypt.CompareHashAndPassword([]byte(pass), []byte(user.Pass)); err != nil {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Hash password"})
+		return
+	}
+
+	//add token
+	token, err := createJWT(uid)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	ctx.Header("authorization", token)
+	ctx.JSON(http.StatusOK, gin.H{"message": "User successfully registered, uuid = " + uid + " , PASS = " + pass})
 }
 
 func (s *Server) AllUsersHandler(ctx *gin.Context) {
@@ -198,4 +238,36 @@ func (s *Server) DeleteBookHandler(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "Book successfully deleted"})
+}
+
+// СОЗДАНИЕ токена (при логине)
+func createJWT(UID string) (string, error) {
+	// Данные для токена
+	claims := Claims{
+		UserID: UID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // 24 часа
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Subject:   fmt.Sprintf("%d", UID),
+		},
+	}
+	// Создаем токен
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	// Подписываем секретным ключом
+	return token.SignedString(secretKey)
+}
+
+func validJWT(tokenString string) (*Claims, error) {
+	// Парсим и проверяем токен
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		return secretKey, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	// Проверяем валидность
+	if claim, ok := token.Claims.(*Claims); ok && token.Valid {
+		return claim, nil
+	}
+	return nil, fmt.Errorf("невалидный токен")
 }

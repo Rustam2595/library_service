@@ -32,14 +32,15 @@ func NewRepo(ctx context.Context, dbAddr string) (*Repository, error) {
 	}, nil
 }
 
-func (r *Repository) SaveUser(user models.User) error {
+func (r *Repository) SaveUser(user models.User) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
-	_, err := r.conn.Exec(ctx, "INSERT INTO Users(uid, name, email, pass) VALUES($1, $2, $3, $4)", uuid.NewString(), user.Name, user.Email, user.Pass)
+	UID := uuid.NewString()
+	_, err := r.conn.Exec(ctx, "INSERT INTO Users(uid, name, email, pass) VALUES($1, $2, $3, $4)", UID, user.Name, user.Email, user.Pass)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	return UID, nil
 }
 
 func (r *Repository) ValidateUser(user models.User) (string, string, error) {
@@ -50,9 +51,9 @@ func (r *Repository) ValidateUser(user models.User) (string, string, error) {
 	if err := row.Scan(&uid, &pass); err != nil {
 		return "", "", ErrUserNotFound
 	}
-	if pass != user.Pass {
-		return "", "", ErrInvalidAuthData
-	}
+	//if pass != user.Pass {
+	//	return "", "", ErrInvalidAuthData
+	//}
 	return uid, pass, nil
 }
 
@@ -79,9 +80,11 @@ func (r *Repository) GetUsers() ([]models.User, error) {
 func (r *Repository) UpdateUser(uid string, user models.User) error {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
-	_, err := r.conn.Exec(ctx, "UPDATE Users SET name = $1, email = $2, pass = $3 WHERE uid = $4)", user.Name, user.Email, user.Pass, uid)
+	log.Println("UpdateUser: ", uid, user)
+	_, err := r.conn.Exec(ctx, "UPDATE Users SET name = $1, email = $2, pass = $3 WHERE uid = $4", user.Name, user.Email, user.Pass, uid)
+	log.Println("UpdateUser_ERR: ", err)
 	if err != nil {
-		return ErrUserNotFound
+		return err
 	}
 	return nil
 }
@@ -140,7 +143,7 @@ func (r *Repository) GetBookById(bid string) (models.Book, error) {
 func (r *Repository) SaveBook(book models.Book) error {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
-	_, err := r.conn.Exec(ctx, "INSERT INTO Books VALUES($1, $2, $3, $4, $5, $6)", uuid.NewString(), book.Label, book.Author, book.Deleted, book.User_UID, book.Created_at)
+	_, err := r.conn.Exec(ctx, "INSERT INTO Books VALUES($1, $2, $3, $4, $5, $6)", uuid.NewString(), book.Label, book.Author, book.Deleted, book.User_UID, time.Now())
 	if err != nil {
 		return err
 	}
