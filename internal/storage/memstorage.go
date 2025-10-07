@@ -60,6 +60,11 @@ func (ms *MemStorage) DeleteUser(uid string) error {
 	delete(ms.UsersMap, uid)
 	return nil
 }
+
+func (ms *MemStorage) DeleteUsers() error {
+	return nil
+}
+
 func (ms *MemStorage) GetBooks() ([]models.Book, error) {
 	var books []models.Book
 	for bid, e := range ms.BooksMap {
@@ -80,6 +85,10 @@ func (ms *MemStorage) GetBookById(bid string) (models.Book, error) {
 	return models.Book{}, ErrBookNotFound
 }
 
+func (ms *MemStorage) GetBookByUid(bid string) ([]models.Book, error) {
+	return []models.Book{}, nil
+}
+
 func (ms *MemStorage) SaveBook(book models.Book) error {
 	nid := uuid.NewString()
 	ms.BooksMap[nid] = book
@@ -91,5 +100,9 @@ func (ms *MemStorage) DeleteBook(bid string) error {
 		return ErrBookNotFound
 	}
 	delete(ms.BooksMap, bid)
+	return nil
+}
+
+func (ms *MemStorage) DeleteBooks() error {
 	return nil
 }

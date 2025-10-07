@@ -35,7 +35,12 @@ func Get(flags ...bool) zerolog.Logger {
 				Logger().
 				Output(zerolog.ConsoleWriter{Out: os.Stderr})
 		} else {
-			log = zerolog.New(os.Stdout).Level(zerolog.InfoLevel).With().Timestamp().Caller().Logger()
+			log = zerolog.New(os.Stdout).
+				Level(zerolog.InfoLevel).
+				With().
+				Timestamp().
+				Caller().
+				Logger()
 		} //если flag поля Config.Debug=true,все логи уровня дебаг и выше выводим на экран
 		//если flag поля Config.Debug=false,все логи уровня info и выше выводим на экран(без debug)
 	})

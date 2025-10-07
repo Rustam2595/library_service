@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Rustam2595/library_service/internal/domain/models"
+	"github.com/Rustam2595/library_service/internal/logger"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -46,7 +47,7 @@ func (r *Repository) SaveUser(user models.User) (string, error) {
 func (r *Repository) ValidateUser(user models.User) (string, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
-	row := r.conn.QueryRow(ctx, "SELECT uid, pass FROM Users WHERE email = $1 AND uid = $2", user.Email, user.UID)
+	row := r.conn.QueryRow(ctx, "SELECT uid, pass FROM Users WHERE email = $1 AND uid = $2 AND deleted_user = false", user.Email, user.UID)
 	var pass, uid string
 	if err := row.Scan(&uid, &pass); err != nil {
 		return "", "", ErrUserNotFound
@@ -60,14 +61,14 @@ func (r *Repository) ValidateUser(user models.User) (string, string, error) {
 func (r *Repository) GetUsers() ([]models.User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
-	rows, err := r.conn.Query(ctx, "SELECT * FROM Users")
+	rows, err := r.conn.Query(ctx, "SELECT * FROM Users WHERE deleted_user = false")
 	if err != nil {
 		return nil, err
 	}
 	var users []models.User
 	for rows.Next() {
 		var user models.User
-		if err := rows.Scan(&user.UID, &user.Name, &user.Email, &user.Pass); err != nil {
+		if err := rows.Scan(&user.UID, &user.Name, &user.Email, &user.Pass, &user.DeletedUser); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
@@ -77,45 +78,69 @@ func (r *Repository) GetUsers() ([]models.User, error) {
 	}
 	return users, nil
 }
+
 func (r *Repository) UpdateUser(uid string, user models.User) error {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 	log.Println("UpdateUser: ", uid, user)
-	_, err := r.conn.Exec(ctx, "UPDATE Users SET name = $1, email = $2, pass = $3 WHERE uid = $4", user.Name, user.Email, user.Pass, uid)
+	_, err := r.conn.Exec(ctx, "UPDATE Users SET name = $1, email = $2, pass = $3 WHERE uid = $4 AND deleted_user = false", user.Name, user.Email, user.Pass, uid)
 	log.Println("UpdateUser_ERR: ", err)
 	if err != nil {
 		return err
 	}
 	return nil
 }
+
 func (r *Repository) DeleteUser(uid string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 	transaction, err := r.conn.Begin(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer transaction.Rollback(ctx)
-	if _, err := transaction.Prepare(ctx, "delete user", "DELETE FROM Users WHERE uid = $1"); err != nil {
+	if _, err := transaction.Prepare(ctx, "update user", "UPDATE Users SET deleted_user = true WHERE uid = $1"); err != nil {
 		return err
 	}
-	if _, err := transaction.Exec(ctx, "delete user", uid); err != nil {
+	result, err := transaction.Exec(ctx, "update user", uid)
+	if err != nil {
 		return ErrUserNotFound
 	}
-	return transaction.Commit(ctx)
+	if result.RowsAffected() == 0 {
+		return ErrUserNotFound
+	}
+	if err := transaction.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) DeleteUsers() error {
+	log := logger.Get()
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	result, err := r.conn.Exec(ctx, "DELETE FROM users WHERE deleted_user = true")
+	if err != nil {
+		log.Error().Err(err).Msg("deleted users failed")
+		return err
+	}
+	deletedCount := result.RowsAffected()
+	log.Debug().Msgf("%d users deleted!", deletedCount)
+	return nil
 }
 
 func (r *Repository) GetBooks() ([]models.Book, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
-	rows, err := r.conn.Query(ctx, "SELECT * FROM Books")
+	rows, err := r.conn.Query(ctx, "SELECT * FROM Books WHERE deleted = false")
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	var books []models.Book
 	for rows.Next() {
 		var book models.Book
-		if err := rows.Scan(&book.BID, &book.Label, &book.Author, &book.Deleted, &book.User_UID, &book.Created_at); err != nil {
+		if err := rows.Scan(&book.BID, &book.Label, &book.Author, &book.Deleted, &book.UserUid, &book.CreatedAt); err != nil {
 			return nil, err
 		}
 		books = append(books, book)
@@ -131,19 +156,52 @@ func (r *Repository) GetBookById(bid string) (models.Book, error) {
 	defer cancel()
 	row := r.conn.QueryRow(ctx, "SELECT * FROM Books WHERE bid = $1", bid)
 	var book models.Book
-	if err := row.Scan(&book.BID, &book.Label, &book.Author, &book.Deleted, &book.User_UID, &book.Created_at); err != nil {
+	if err := row.Scan(&book.BID, &book.Label, &book.Author, &book.Deleted, &book.UserUid, &book.CreatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return models.Book{}, fmt.Errorf("book with id = %s, does not exist", bid)
 		}
 		return models.Book{}, ErrBookNotFound
 	}
+	if book.Deleted {
+		return models.Book{}, ErrBookWasDeleted
+	}
 	return book, nil
+}
+
+func (r *Repository) GetBookByUid(uid string) ([]models.Book, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	rows, err := r.conn.Query(ctx, "SELECT bid,label,author,deleted,user_uid,created_at FROM Books WHERE deleted = false AND user_uid = $1", uid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	//books := make([]models.Book, 0)
+	//for rows.Next() {
+	//	var book models.Book
+	//	if err := rows.Scan(&book.BID, &book.Label, &book.Author, &book.Deleted, &book.UserUid, &book.CreatedAt); err != nil {
+	//		return nil, err
+	//	}
+	//	books = append(books, book)
+	//}
+	//if err := rows.Err(); err != nil {
+	//	return nil, fmt.Errorf("error iterating rows: %w", err)
+	//}
+	// Автоматически сканирует все строки в слайс
+	books, err := pgx.CollectRows(rows, pgx.RowToStructByName[models.Book])
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect books: %w", err)
+	}
+	if len(books) == 0 {
+		return nil, ErrBooksListEmpty
+	}
+	return books, nil
 }
 
 func (r *Repository) SaveBook(book models.Book) error {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
-	_, err := r.conn.Exec(ctx, "INSERT INTO Books VALUES($1, $2, $3, $4, $5, $6)", uuid.NewString(), book.Label, book.Author, book.Deleted, book.User_UID, time.Now())
+	_, err := r.conn.Exec(ctx, "INSERT INTO Books VALUES($1, $2, $3, $4, $5, $6)", uuid.NewString(), book.Label, book.Author, book.Deleted, book.UserUid, time.Now())
 	if err != nil {
 		return err
 	}
@@ -151,20 +209,44 @@ func (r *Repository) SaveBook(book models.Book) error {
 }
 
 func (r *Repository) DeleteBook(bid string) error {
+	log := logger.Get()
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 	transaction, err := r.conn.Begin(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer transaction.Rollback(ctx)
-	if _, err := transaction.Prepare(ctx, "delete book", "DELETE FROM Books WHERE bid = $1"); err != nil {
+	if _, err := transaction.Prepare(ctx, "update book", "UPDATE Books SET deleted = true WHERE bid = $1"); err != nil {
 		return err
 	}
-	if _, err := transaction.Exec(ctx, "delete book", bid); err != nil {
+	result, err := transaction.Exec(ctx, "update book", bid)
+	if err != nil {
+		return fmt.Errorf("failed to delete book: %w", err)
+	}
+	if result.RowsAffected() == 0 {
 		return ErrBookNotFound
 	}
-	return transaction.Commit(ctx)
+	log.Debug().Msgf("book id = %s, deleted = %t", bid, true)
+
+	if err := transaction.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) DeleteBooks() error {
+	log := logger.Get()
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	res, err := r.conn.Exec(ctx, "DELETE FROM Books WHERE deleted = true")
+	if err != nil {
+		log.Error().Err(err).Msg("deleted books failed")
+		return err
+	}
+	deletedCount := res.RowsAffected()
+	log.Debug().Msgf("%d books deleted!", deletedCount)
+	return nil
 }
 
 func Migrations(dbAddr, migrationsPath string) error {

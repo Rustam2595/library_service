@@ -2,7 +2,8 @@ CREATE TABLE IF NOT EXISTS Users (
     uid VARCHAR(36) PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT NOT NULL,
-    pass TEXT NOT NULL
+    pass TEXT NOT NULL,
+    deleted_user BOOLEAN NOT NULL DEFAULT false
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON Users (email);
@@ -17,4 +18,4 @@ CREATE TABLE IF NOT EXISTS Books(
     CONSTRAINT fk_books_user FOREIGN KEY (user_uid) REFERENCES Users(uid) ON DELETE CASCADE
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_books_user_uid ON Books (user_uid); --user_uid будет уникальным
+CREATE /*UNIQUE*/ INDEX IF NOT EXISTS idx_books_user_uid ON Books (user_uid); --user_uid будет уникальным
