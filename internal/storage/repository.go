@@ -52,9 +52,9 @@ func (r *Repository) ValidateUser(user models.User) (string, string, error) {
 	if err := row.Scan(&uid, &pass); err != nil {
 		return "", "", ErrUserNotFound
 	}
-	//if pass != user.Pass {
-	//	return "", "", ErrInvalidAuthData
-	//}
+	if pass != user.Pass {
+		return "", "", ErrInvalidAuthData
+	}
 	return uid, pass, nil
 }
 
@@ -82,11 +82,9 @@ func (r *Repository) GetUsers() ([]models.User, error) {
 func (r *Repository) UpdateUser(uid string, user models.User) error {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
-	log.Println("UpdateUser: ", uid, user)
 	_, err := r.conn.Exec(ctx, "UPDATE Users SET name = $1, email = $2, pass = $3 WHERE uid = $4 AND deleted_user = false", user.Name, user.Email, user.Pass, uid)
-	log.Println("UpdateUser_ERR: ", err)
 	if err != nil {
-		return err
+		return ErrUserNotFound
 	}
 	return nil
 }
@@ -116,16 +114,16 @@ func (r *Repository) DeleteUser(uid string) error {
 }
 
 func (r *Repository) DeleteUsers() error {
-	log := logger.Get()
+	zLog := logger.Get()
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 	result, err := r.conn.Exec(ctx, "DELETE FROM users WHERE deleted_user = true")
 	if err != nil {
-		log.Error().Err(err).Msg("deleted users failed")
+		zLog.Error().Err(err).Msg("deleted users failed")
 		return err
 	}
 	deletedCount := result.RowsAffected()
-	log.Debug().Msgf("%d users deleted!", deletedCount)
+	zLog.Debug().Msgf("%d users deleted!", deletedCount)
 	return nil
 }
 

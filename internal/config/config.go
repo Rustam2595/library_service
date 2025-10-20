@@ -15,7 +15,7 @@ type Config struct {
 }
 
 const (
-	defaultBbDSN       = "postgres://ru:2595@127.0.0.1:5432/ru_DB?sslmode=disable"
+	defaultDbDSN       = "postgres://ru:2595@127.0.0.1:5432/ru_DB?sslmode=disable"
 	defaultMigratePath = "migrations"
 	defaultHost        = ":8080"
 	//defaultAuthAddr    = "localhost:8081"
@@ -24,29 +24,39 @@ const (
 func ReadConfig() Config {
 	var host, dbDsn, migratePath string
 	flag.StringVar(&host, "host", defaultHost, "server host")
-	flag.StringVar(&dbDsn, "db", defaultBbDSN, "data base address")
-	flag.StringVar(&migratePath, "mPath", defaultMigratePath, "migrate path")
-	debug := flag.Bool("debug", false, "enable debug logging lvl")
+	flag.StringVar(&dbDsn, "db", defaultDbDSN, "data base addres")
+	flag.StringVar(&migratePath, "m", defaultMigratePath, "path to migrations")
+	debug := flag.Bool("debug", false, "enable debug logging level")
 	flag.Parse()
-	hostEnv := os.Getenv("SERVER_HOST") //хост взяли из переменной окружения (echo $SERVER_HOST)
+
+	hostEnv := os.Getenv("SERVER_HOS")
+	dbDsnEnv := os.Getenv("DB_DSN")
+	migratePathEnv := os.Getenv("MIGRATE_PATH")
+	log.Println(hostEnv)
 	if hostEnv != "" && host == defaultHost {
 		host = hostEnv
 	}
-	log.Println("host: ", host)
-	dbDsnEnv := os.Getenv("DB_DSN") //хост взяли из переменной окружения (echo $DB_DSN)
-	if dbDsnEnv != "" && dbDsn == defaultBbDSN {
+	if dbDsnEnv != "" && dbDsn == defaultDbDSN {
 		dbDsn = dbDsnEnv
 	}
-	log.Println("dbDsn: ", dbDsn)
-	migratePathEnv := os.Getenv("MIGRATE_PATH") //хост взяли из переменной окружения (echo $MIGRATE_PATH)
 	if migratePathEnv != "" && migratePath == defaultMigratePath {
 		migratePath = migratePathEnv
 	}
-	log.Println("migratePath: ", migratePath)
+	//authAddr := cmp.Or(os.Getenv("AUTH_ADDR"), defaultAuthAddr)
 	return Config{
 		Host:        host,
 		DBDsn:       dbDsn,
 		MigratePath: migratePath,
-		Debug:       *debug,
+		//AuthAddr:    authAddr,
+		Debug: *debug,
 	}
 }
+
+//func getEnvDefault(key, defaultVal, currVal string) *string {
+//	if os.Getenv(key) != "" && currVal == defaultVal {
+//		log.Printf("defaultValue of %s is %s", key, defaultVal)
+//		return &defaultVal
+//	}
+//	log.Printf("currentValue of %s is %s", key, currVal)
+//	return &currVal
+//}

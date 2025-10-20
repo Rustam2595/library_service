@@ -302,11 +302,11 @@ func (s *Server) ShutdownServer(ctx context.Context) error {
 }
 
 func (s *Server) Deleter(ctx context.Context) {
-	log := logger.Get()
+	//log := logger.Get()
 	for {
 		select {
 		case <-ctx.Done():
-			log.Debug().Msg("context done, shutdown")
+			//log.Debug().Msg("context done, shutdown")
 			return
 		default:
 			if len(s.deleteChan) == 2 {
@@ -323,7 +323,7 @@ func (s *Server) Deleter(ctx context.Context) {
 					<-s.deleteUserChan
 				}
 				if err := s.storage.DeleteUsers(); err != nil {
-					log.Error().Err(err).Msg("error deleting users!")
+					//log.Error().Err(err).Msg("error deleting users!")
 					return
 				}
 			}
