@@ -1,6 +1,7 @@
 package config
 
 import (
+	"cmp"
 	"flag"
 	"log"
 	"os"
@@ -10,15 +11,17 @@ type Config struct {
 	Host        string
 	DBDsn       string
 	MigratePath string
-	//AuthAddr    string
-	Debug bool
+	AuthAddr    string
+	BooksAddr   string
+	Debug       bool
 }
 
 const (
 	defaultDbDSN       = "postgres://ru:2595@127.0.0.1:5432/ru_DB?sslmode=disable"
 	defaultMigratePath = "migrations"
 	defaultHost        = ":8080"
-	//defaultAuthAddr    = "localhost:8081"
+	defaultAuthAddr    = "localhost:8081"
+	defaultBooksAddr   = "localhost:8082"
 )
 
 func ReadConfig() Config {
@@ -33,30 +36,17 @@ func ReadConfig() Config {
 	dbDsnEnv := os.Getenv("DB_DSN")
 	migratePathEnv := os.Getenv("MIGRATE_PATH")
 	log.Println(hostEnv)
-	if hostEnv != "" && host == defaultHost {
-		host = hostEnv
-	}
-	if dbDsnEnv != "" && dbDsn == defaultDbDSN {
-		dbDsn = dbDsnEnv
-	}
-	if migratePathEnv != "" && migratePath == defaultMigratePath {
-		migratePath = migratePathEnv
-	}
-	//authAddr := cmp.Or(os.Getenv("AUTH_ADDR"), defaultAuthAddr)
+	host = cmp.Or(hostEnv, defaultHost)
+	dbDsn = cmp.Or(dbDsnEnv, defaultDbDSN)
+	migratePath = cmp.Or(migratePathEnv, defaultMigratePath)
+	authAddr := cmp.Or(os.Getenv("AUTH_ADDR"), defaultAuthAddr)
+	booksAddr := cmp.Or(os.Getenv("BOOKS_ADDR"), defaultBooksAddr)
 	return Config{
 		Host:        host,
 		DBDsn:       dbDsn,
 		MigratePath: migratePath,
-		//AuthAddr:    authAddr,
-		Debug: *debug,
+		AuthAddr:    authAddr,
+		BooksAddr:   booksAddr,
+		Debug:       *debug,
 	}
 }
-
-//func getEnvDefault(key, defaultVal, currVal string) *string {
-//	if os.Getenv(key) != "" && currVal == defaultVal {
-//		log.Printf("defaultValue of %s is %s", key, defaultVal)
-//		return &defaultVal
-//	}
-//	log.Printf("currentValue of %s is %s", key, currVal)
-//	return &currVal
-//}

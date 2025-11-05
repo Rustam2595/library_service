@@ -11,7 +11,7 @@ type User struct {
 }
 
 type Book struct {
-	BID       string    `json:"b_id"`
+	BID       string    `json:"bid"`
 	Label     string    `json:"label" validate:"required"`
 	Author    string    `json:"author" validate:"required"`
 	Deleted   bool      `json:"delete"`

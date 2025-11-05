@@ -3,10 +3,14 @@ package main
 import (
 	"context"
 	"github.com/Rustam2595/library_service/internal/config"
+	authservicev1 "github.com/Rustam2595/library_service/internal/gen/go"
+	books_servicev1 "github.com/Rustam2595/library_service/internal/genBooks/go"
 	"github.com/Rustam2595/library_service/internal/logger"
 	serv "github.com/Rustam2595/library_service/internal/server"
 	store "github.com/Rustam2595/library_service/internal/storage"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"os"
 	"os/signal"
 	"syscall"
@@ -35,8 +39,28 @@ func main() {
 	if err := store.Migrations(cnf.DBDsn, cnf.MigratePath); err != nil {
 		log.Fatal().Err(err).Msg("Migrations failed")
 	}
+	log.Debug().Msg("go to client")
+	//auth_service:
+	// Подключаемся к серверу
+	connAuth, err := grpc.NewClient(cnf.AuthAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to connect to grpc auth server")
+	}
+	defer connAuth.Close()
+	// Создаём клиента
+	clientAuth := authservicev1.NewAuthServiceClient(connAuth)
 
-	server := serv.New(cnf.Host, str)
+	//books_service:
+	// Подключаемся к серверу
+	connBooks, err := grpc.NewClient(cnf.BooksAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to connect to grpc books server")
+	}
+	defer connBooks.Close()
+	// Создаём клиента
+	clientBooks := books_servicev1.NewBooksServiceClient(connBooks)
+
+	server := serv.New(cnf.Host, str, clientAuth, clientBooks)
 
 	group, gCtx := errgroup.WithContext(ctx)
 	group.Go(func() error {

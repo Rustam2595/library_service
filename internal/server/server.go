@@ -5,14 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Rustam2595/library_service/internal/domain/models"
+	authservicev1 "github.com/Rustam2595/library_service/internal/gen/go"
+	books_servicev1 "github.com/Rustam2595/library_service/internal/genBooks/go"
 	"github.com/Rustam2595/library_service/internal/logger"
 	"github.com/Rustam2595/library_service/internal/storage"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	//"golang.org/x/crypto/bcrypt"
 	"net/http"
-	"time"
 )
 
 var secretKey = []byte("VerySecretKey2000")
@@ -45,9 +49,11 @@ type Server struct {
 	deleteChan     chan int
 	deleteUserChan chan int
 	ErrChan        chan error
+	AuthClient     authservicev1.AuthServiceClient
+	BooksClient    books_servicev1.BooksServiceClient
 }
 
-func New(host string, storage Storage) *Server {
+func New(host string, storage Storage, authClient authservicev1.AuthServiceClient, booksClient books_servicev1.BooksServiceClient) *Server {
 	serv := http.Server{
 		Addr: host,
 	}
@@ -61,6 +67,8 @@ func New(host string, storage Storage) *Server {
 		deleteChan:     dChan,
 		deleteUserChan: dUserChan,
 		ErrChan:        errChan,
+		AuthClient:     authClient,
+		BooksClient:    booksClient,
 	}
 }
 func (s *Server) Run(ctx context.Context) error {
@@ -92,37 +100,56 @@ func (s *Server) Run(ctx context.Context) error {
 }
 
 func (s *Server) RegisterHandler(ctx *gin.Context) {
+	zLog := logger.Get()
 	var user models.User
 	if err := ctx.ShouldBindBodyWithJSON(&user); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	passHash, err := bcrypt.GenerateFromPassword([]byte(user.Pass), bcrypt.DefaultCost)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	user.Pass = string(passHash)
 	if err := s.validator.Struct(user); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	uid, err := s.storage.SaveUser(user)
+	zLog.Debug().Msg("User successfully registered with JSON")
+	//passHash, err := bcrypt.GenerateFromPassword([]byte(user.Pass), bcrypt.DefaultCost)
+	//if err != nil {
+	//	ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	//	return
+	//}
+	//user.Pass = string(passHash)
+	//uid, err := s.storage.SaveUser(user)
+	//if err != nil {
+	//	ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	//	return
+	//}
+	////add JWT
+	//token, err := createJWT(uid)
+	//if err != nil {
+	//	ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	//	return
+	//}
+	authResp, err := s.AuthClient.Register(context.TODO(), &authservicev1.User{
+		Name:  user.Name,
+		Email: user.Email,
+		Pass:  user.Pass,
+	})
 	if err != nil {
+		if status.Code(err) == codes.AlreadyExists {
+			zLog.Error().Err(err).Msg("user already exists")
+			ctx.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		}
+		zLog.Error().Err(err).Msg("Failed to register user")
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	//add JWT
-	token, err := createJWT(uid)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	ctx.Header("authorization", token)
+	zLog.Debug().Str("token:", authResp.Token).Str("msg:", authResp.Message).Msg("grpc login request successful")
+	ctx.Header("authorization", authResp.Token)
 	ctx.JSON(http.StatusOK, gin.H{"message": "User successfully registered"})
 }
 
 func (s *Server) AuthHandler(ctx *gin.Context) {
+	zLog := logger.Get()
 	var user models.User
 	if err := ctx.ShouldBindBodyWithJSON(&user); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -132,31 +159,48 @@ func (s *Server) AuthHandler(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	uid, pass, err := s.storage.ValidateUser(user)
+	zLog.Debug().Msg("User successfully auth with JSON")
+	//uid, pass, err := s.storage.ValidateUser(user)
+	//if err != nil {
+	//	if errors.Is(err, storage.ErrInvalidAuthData) {
+	//		ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+	//		return
+	//	}
+	//	//errors.As()
+	//	ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	//	return
+	//}
+	//if err = bcrypt.CompareHashAndPassword([]byte(pass), []byte(user.Pass)); err != nil {
+	//	ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Hash password"})
+	//	return
+	//}
+	////add token
+	//token, err := createJWT(uid)
+	//if err != nil {
+	//	ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	//	return
+	//}
+	authResp, err := s.AuthClient.Login(context.TODO(), &authservicev1.UserCreds{
+		Email: user.Email,
+		Pass:  user.Pass,
+	})
 	if err != nil {
-		if errors.Is(err, storage.ErrInvalidAuthData) {
+		if status.Code(err) == codes.NotFound {
+			zLog.Error().Err(err).Msg("user not found in DB")
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		} else if status.Code(err) == codes.Unauthenticated {
+			zLog.Error().Err(err).Msg("invalid password")
 			ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
-		//errors.As()
+		zLog.Error().Err(err).Msg("Failed to login, err auth service")
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	if err = bcrypt.CompareHashAndPassword([]byte(pass), []byte(user.Pass)); err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid Hash password"})
-		return
-	}
-
-	//add token
-	token, err := createJWT(uid)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	ctx.Header("authorization", token)
-	ctx.JSON(http.StatusOK, gin.H{"message": "User successfully registered, uuid = " + uid + " , PASS = " + pass})
+	zLog.Debug().Str("token:", authResp.Token).Str("msg:", authResp.Message).Msg("grpc login request successful")
+	ctx.Header("authorization", authResp.Token)
+	ctx.JSON(http.StatusOK, gin.H{"message": "email = " + user.Email + " , PASS = " + user.Pass + authResp.Message})
 }
 
 func (s *Server) AllUsersHandler(ctx *gin.Context) {
@@ -253,29 +297,53 @@ func (s *Server) GetBookByIdHandler(ctx *gin.Context) {
 }
 
 func (s *Server) SaveBookHandler(ctx *gin.Context) {
-	log := logger.Get()
+	zlog := logger.Get()
 	var book models.Book
 	if err := ctx.ShouldBindBodyWithJSON(&book); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
 	if err := s.validator.Struct(book); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	token := ctx.GetHeader("Authorization")
-	uid, err := validJWT(token)
-	log.Debug().Msgf("token=%v, uid=%v", token, uid)
+	zlog.Debug().Msgf("book=%v ready to save", book)
+
+	booksResp, err := s.BooksClient.CreateBook(context.TODO(), &books_servicev1.AuthRequest{
+		Label:   book.Label,
+		Author:  book.Author,
+		UserUid: book.UserUid,
+	})
 	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-		return
-	}
-	book.UserUid = uid
-	if err := s.storage.SaveBook(book); err != nil {
+		if status.Code(err) == codes.Internal {
+			zlog.Error().Err(err).Msg("token error")
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		} else if status.Code(err) == codes.Unauthenticated {
+			zlog.Error().Err(err).Msg("invalid token")
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
+		zlog.Error().Err(err).Msg("Failed to create book")
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	zlog.Debug().Str("token:", booksResp.Token).Str("msg:", booksResp.Message).Msg("grpc createBooks request successful")
+
+	//token := ctx.GetHeader("Authorization")
+	//uid, err := validJWT(token)
+	//log.Debug().Msgf("token=%v, uid=%v", token, uid)
+	//if err != nil {
+	//	ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+	//	return
+	//}
+	//book.UserUid = uid
+	//if err := s.storage.SaveBook(book); err != nil {
+	//	ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	//	return
+	//}
+
 	ctx.JSON(http.StatusCreated, gin.H{"message": "Book successfully saved"})
 }
 
@@ -332,21 +400,21 @@ func (s *Server) Deleter(ctx context.Context) {
 }
 
 // СОЗДАНИЕ токена (при логине)
-func createJWT(UID string) (string, error) {
-	// Данные для токена
-	claims := Claims{
-		UserID: UID,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // 24 часа
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Subject:   UID,
-		},
-	}
-	// Создаем токен
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	// Подписываем секретным ключом
-	return token.SignedString(secretKey)
-}
+//func createJWT(UID string) (string, error) {
+//	// Данные для токена
+//	claims := Claims{
+//		UserID: UID,
+//		RegisteredClaims: jwt.RegisteredClaims{
+//			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // 24 часа
+//			IssuedAt:  jwt.NewNumericDate(time.Now()),
+//			Subject:   UID,
+//		},
+//	}
+//	// Создаем токен
+//	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+//	// Подписываем секретным ключом
+//	return token.SignedString(secretKey)
+//}
 
 func validJWT(tokenString string) (string, error) {
 	claims := &Claims{}
