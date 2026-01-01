@@ -1,0 +1,38 @@
+# Файл: .github/workflows/ci.yml
+# Простой CI для начала
+
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    name: Test and Build
+    runs-on: ubuntu-latest  # Запускается на сервере GitHub, а не на твоём Mac
+
+    steps:
+      # Скачать код
+      - uses: actions/checkout@v4
+
+      # Установить Go
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.0'  # ИЗМЕНИ НА СВОЮ ВЕРСИЮ!
+          cache: true         # Ускоряет повторные запуски
+
+      # Скачать зависимости
+      - name: Download dependencies
+        run: go mod download
+
+      # Запустить тесты
+      - name: Run tests
+        run: go test -v ./...
+
+      # Собрать приложение
+      - name: Build
+        run: go build -v ./...
