@@ -24,6 +24,8 @@ func TestReadConfig(t *testing.T) {
 				Host:        "124.123.1.11:8080",
 				DBDsn:       defaultDbDSN,
 				MigratePath: defaultMigratePath,
+				AuthAddr:    defaultAuthAddr,
+				BooksAddr:   defaultBooksAddr,
 				Debug:       true,
 			},
 		},
@@ -31,14 +33,18 @@ func TestReadConfig(t *testing.T) {
 			name:  "Test ReadConfig() func; Case 2:",
 			flags: []string{"test", "-debug"},
 			env: func() {
-				t.Setenv("SERVER_HOS", "1.1.1.1:1111")
+				t.Setenv("SERVER_HOST", "1.1.1.1:1111")
 				t.Setenv("DB_DSN", "testDsn")
 				t.Setenv("MIGRATE_PATH", "testMigratePath")
+				t.Setenv("AUTH_ADDR", ":8081")
+				t.Setenv("BOOKS_ADDR", ":8082")
 			},
 			want: Config{
 				Host:        "1.1.1.1:1111",
 				DBDsn:       "testDsn",
 				MigratePath: "testMigratePath",
+				AuthAddr:    ":8081",
+				BooksAddr:   ":8082",
 				Debug:       true,
 			},
 		},
