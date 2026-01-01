@@ -1,10 +1,11 @@
 package logger
 
 import (
-	"github.com/rs/zerolog"
 	"os"
 	"strconv"
 	"sync"
+
+	"github.com/rs/zerolog"
 )
 
 var once sync.Once //такая переменная, что отработает 1 раз
@@ -41,8 +42,8 @@ func Get(flags ...bool) zerolog.Logger {
 				Timestamp().
 				Caller().
 				Logger()
-		} //если flag поля Config.Debug=true,все логи уровня дебаг и выше выводим на экран
-		//если flag поля Config.Debug=false,все логи уровня info и выше выводим на экран(без debug)
+		} //если flag поля Config.Debug = true, все логи уровня debug и выше выводим на экран
+		//если flag поля Config.Debug = false, все логи уровня info и выше выводим на экран(без debug)
 	})
 	return log
 }

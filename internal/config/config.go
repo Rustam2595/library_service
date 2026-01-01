@@ -27,7 +27,7 @@ const (
 func ReadConfig() Config {
 	var host, dbDsn, migratePath string
 	flag.StringVar(&host, "host", defaultHost, "server host")
-	flag.StringVar(&dbDsn, "db", defaultDbDSN, "data base addres")
+	flag.StringVar(&dbDsn, "db", defaultDbDSN, "data base address")
 	flag.StringVar(&migratePath, "m", defaultMigratePath, "path to migrations")
 	debug := flag.Bool("debug", false, "enable debug logging level")
 	flag.Parse()

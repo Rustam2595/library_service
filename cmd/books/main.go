@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/Rustam2595/library_service/internal/config"
 	authservicev1 "github.com/Rustam2595/library_service/internal/gen/go"
 	books_servicev1 "github.com/Rustam2595/library_service/internal/genBooks/go"
@@ -11,9 +15,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 func main() {
@@ -36,7 +37,7 @@ func main() {
 		str = store.New()
 		log.Fatal().Err(err).Msg("failed to connect to database")
 	}
-	if err := store.Migrations(cnf.DBDsn, cnf.MigratePath); err != nil {
+	if err = store.Migrations(cnf.DBDsn, cnf.MigratePath); err != nil {
 		log.Fatal().Err(err).Msg("Migrations failed")
 	}
 	log.Debug().Msg("go to client")
@@ -46,7 +47,11 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to grpc auth server")
 	}
-	defer connAuth.Close()
+	defer func() {
+		if err = connAuth.Close(); err != nil {
+			log.Fatal().Err(err).Msg("failed to stop users gRPC server")
+		}
+	}()
 	// Создаём клиента
 	clientAuth := authservicev1.NewAuthServiceClient(connAuth)
 
@@ -56,7 +61,11 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to grpc books server")
 	}
-	defer connBooks.Close()
+	defer func() {
+		if err = connBooks.Close(); err != nil {
+			log.Fatal().Err(err).Msg("failed to stop books gRPC server")
+		}
+	}()
 	// Создаём клиента
 	clientBooks := books_servicev1.NewBooksServiceClient(connBooks)
 
@@ -65,7 +74,7 @@ func main() {
 	group, gCtx := errgroup.WithContext(ctx)
 	group.Go(func() error {
 		log.Info().Msg("starting server")
-		if err := server.Run(gCtx); err != nil {
+		if err = server.Run(gCtx); err != nil {
 			return err
 		}
 		return nil
@@ -75,9 +84,10 @@ func main() {
 	})
 	group.Go(func() error {
 		<-gCtx.Done()
+
 		return server.ShutdownServer(gCtx)
 	})
-	if err := group.Wait(); err != nil {
+	if err = group.Wait(); err != nil {
 		log.Fatal().Err(err).Msg("fatal server stopped")
 	}
 	log.Info().Msg("server was stopped")

@@ -96,34 +96,34 @@ func (mr *MockStorageMockRecorder) DeleteUsers() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUsers", reflect.TypeOf((*MockStorage)(nil).DeleteUsers))
 }
 
-// GetBookById mocks base method.
-func (m *MockStorage) GetBookById(arg0 string) (models.Book, error) {
+// GetBookByID mocks base method.
+func (m *MockStorage) GetBookByID(arg0 string) (models.Book, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBookById", arg0)
+	ret := m.ctrl.Call(m, "GetBookByID", arg0)
 	ret0, _ := ret[0].(models.Book)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetBookById indicates an expected call of GetBookById.
-func (mr *MockStorageMockRecorder) GetBookById(arg0 any) *gomock.Call {
+// GetBookByID indicates an expected call of GetBookByID.
+func (mr *MockStorageMockRecorder) GetBookByID(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBookById", reflect.TypeOf((*MockStorage)(nil).GetBookById), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBookByID", reflect.TypeOf((*MockStorage)(nil).GetBookByID), arg0)
 }
 
-// GetBookByUid mocks base method.
-func (m *MockStorage) GetBookByUid(arg0 string) ([]models.Book, error) {
+// GetBookByUID mocks base method.
+func (m *MockStorage) GetBookByUID(arg0 string) ([]models.Book, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBookByUid", arg0)
+	ret := m.ctrl.Call(m, "GetBookByUID", arg0)
 	ret0, _ := ret[0].([]models.Book)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetBookByUid indicates an expected call of GetBookByUid.
-func (mr *MockStorageMockRecorder) GetBookByUid(arg0 any) *gomock.Call {
+// GetBookByUID indicates an expected call of GetBookByUID.
+func (mr *MockStorageMockRecorder) GetBookByUID(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBookByUid", reflect.TypeOf((*MockStorage)(nil).GetBookByUid), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBookByUID", reflect.TypeOf((*MockStorage)(nil).GetBookByUID), arg0)
 }
 
 // GetBooks mocks base method.

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/Rustam2595/library_service/internal/domain/models"
 	authservicev1 "github.com/Rustam2595/library_service/internal/gen/go"
 	books_servicev1 "github.com/Rustam2595/library_service/internal/genBooks/go"
@@ -36,8 +38,8 @@ type Storage interface {
 	DeleteUser(string) error
 	DeleteUsers() error
 	GetBooks() ([]models.Book, error)
-	GetBookById(string) (models.Book, error)
-	GetBookByUid(string) ([]models.Book, error)
+	GetBookByID(string) (models.Book, error)
+	GetBookByUID(string) ([]models.Book, error)
 	SaveBook(models.Book) error
 	DeleteBook(string) error
 	DeleteBooks() error
@@ -53,9 +55,16 @@ type Server struct {
 	BooksClient    books_servicev1.BooksServiceClient
 }
 
-func New(host string, storage Storage, authClient authservicev1.AuthServiceClient, booksClient books_servicev1.BooksServiceClient) *Server {
+func New(host string,
+	storage Storage,
+	authClient authservicev1.AuthServiceClient,
+	booksClient books_servicev1.BooksServiceClient) *Server {
 	serv := http.Server{
-		Addr: host,
+		Addr:              host,
+		ReadHeaderTimeout: 5 * time.Second,  // время на чтение заголовков
+		ReadTimeout:       10 * time.Second, // время на весь запрос (опц.)
+		WriteTimeout:      10 * time.Second, // время на отправку ответа (опц.)
+		IdleTimeout:       60 * time.Second, // для keep-alive (опц.)
 	}
 	dChan := make(chan int, 2)
 	dUserChan := make(chan int, 2)
@@ -257,7 +266,7 @@ func (s *Server) BooksByUser(ctx *gin.Context) {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 		return
 	}
-	books, err := s.storage.GetBookByUid(uid)
+	books, err := s.storage.GetBookByUID(uid)
 	if err != nil {
 		if errors.Is(err, storage.ErrBooksListEmpty) {
 			ctx.JSON(http.StatusNoContent, gin.H{"error": err.Error()})
@@ -284,7 +293,7 @@ func (s *Server) AllBooksHandler(ctx *gin.Context) {
 
 func (s *Server) GetBookByIdHandler(ctx *gin.Context) {
 	bid := ctx.Param("id")
-	book, err := s.storage.GetBookById(bid)
+	book, err := s.storage.GetBookByID(bid)
 	if err != nil {
 		if errors.Is(err, storage.ErrBookNotFound) {
 			ctx.JSON(http.StatusNoContent, err.Error())
@@ -312,7 +321,7 @@ func (s *Server) SaveBookHandler(ctx *gin.Context) {
 	booksResp, err := s.BooksClient.CreateBook(context.TODO(), &books_servicev1.AuthRequest{
 		Label:   book.Label,
 		Author:  book.Author,
-		UserUid: book.UserUid,
+		UserUid: book.UserUID,
 	})
 	if err != nil {
 		if status.Code(err) == codes.Internal {

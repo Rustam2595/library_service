@@ -1,0 +1,150 @@
+run:
+  timeout: 5m
+  tests: true
+
+output:
+  formats:
+    - format: colored-line-number
+
+linters:
+  disable-all: true
+  enable:
+    # База
+    - govet
+    - errcheck
+    - staticcheck
+    - ineffassign
+    - typecheck
+    - unused
+
+    # Стиль
+    #- revive
+    - gosimple
+    - whitespace
+    - gofmt
+    - goimports
+
+    # Надёжность
+    - bodyclose
+    - nilerr
+    - errorlint
+
+    # Безопасность (мягко)
+    - gosec
+
+linters-settings:
+  revive:
+    severity: warning
+    rules:
+      - name: var-naming
+      - name: line-length-limit
+        arguments: [120]
+      - name: exported
+      - name: unused-parameter
+      - name: indent-error-flow
+
+  gosec:
+    severity: medium
+    confidence: medium
+    excludes:
+      - G104
+
+  errorlint:
+    errorf: true
+    asserts: true
+    comparison: true
+
+issues:
+  # новые замены skip-dirs / skip-files
+  exclude-dirs:
+    - vendor
+
+  exclude-files:
+    - ".*_gen.go"
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-use-default: false
+
+  exclude-rules:
+    # Не душим тесты
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck
+
+    # Иногда допускаем fmt.Errorf без %w
+    - text: "should wrap errors with fmt.Errorf"
+      linters:
+        - errorlint
+
+## Файл: .golangci.yml
+## Конфигурация golangci-lint для джуна
+#
+## Общие настройки
+#run:
+#  # Таймаут для анализа
+#  timeout: 5m
+#
+#  # Какие папки проверять
+#  tests: true
+#
+#  # Go версия
+#  go: '1.21'
+#
+## Какие линтеры включить
+#linters:
+#  enable:
+#    # Обязательные для джуна (базовые проверки)
+#    - errcheck      # проверка обработки ошибок
+#    - gosimple      # упрощение кода
+#    - govet         # стандартные проверки Go
+#    - ineffassign   # неэффективные присваивания
+#    - staticcheck   # много полезных проверок
+#    - unused        # неиспользуемый код
+#
+#    # Стиль кода
+#    - gofmt         # форматирование
+#    - goimports     # импорты
+#    - misspell      # опечатки в комментариях
+#
+#    # Читаемость
+#    - gosec         # безопасность
+#    - dupl          # дублирование кода
+#    - goconst       # повторяющиеся строки/числа
+#
+#  # Можно отключить слишком строгие
+#  disable:
+#    - lll           # длина строк (слишком строгий для джуна)
+#    - gocyclo       # сложность функций
+#
+## Настройки для конкретных линтеров
+#linters-settings:
+#  errcheck:
+#    # Проверять ли ошибки от fmt.Print*
+#    check-blank: false
+#
+#  govet:
+#    # Проверять printf-подобные функции
+#    check-shadowing: true
+#
+#  goimports:
+#    # Убирать неиспользуемые импорты
+#    local-prefixes: github.com/yourname/yourproject
+#
+#  misspell:
+#    locale: US
+#
+## Какие ошибки игнорировать
+#issues:
+#  # Показывать все проблемы (не останавливаться на первой)
+#  max-issues-per-linter: 0
+#  max-same-issues: 0
+#
+#  # Исключения (для файлов с тестами можно ослабить правила)
+#  exclude-rules:
+#    # Игнорировать некоторые проверки в тестах
+#    - path: _test\.go
+#      linters:
+#        - dupl
+#        - gosec

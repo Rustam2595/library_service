@@ -50,7 +50,6 @@ func TestReadConfig(t *testing.T) {
 				flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 			}
 			if tc.env != nil {
-
 				tc.env()
 			}
 			cfg := ReadConfig()

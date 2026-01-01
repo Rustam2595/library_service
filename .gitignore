@@ -1,1 +1,18 @@
+cat > .gitignore << EOF
+# Бинарники
+bin/
+*.exe
+*.exe~
+
+# Тесты
+coverage.out
+coverage.html
+
+# IDE
 .idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+EOF

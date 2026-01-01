@@ -10,6 +10,7 @@ type MemStorage struct {
 	BooksMap map[string]models.Book
 }
 
+// New создаёт и инициализирует MemStorage с пустыми картами пользователей и книг.
 func New() *MemStorage {
 	uMap := make(map[string]models.User)
 	bMap := make(map[string]models.Book)
@@ -77,7 +78,7 @@ func (ms *MemStorage) GetBooks() ([]models.Book, error) {
 	return books, nil
 }
 
-func (ms *MemStorage) GetBookById(bid string) (models.Book, error) {
+func (ms *MemStorage) GetBookByID(bid string) (models.Book, error) {
 	if book, ok := ms.BooksMap[bid]; ok {
 		book.BID = bid
 		return book, nil
@@ -85,7 +86,7 @@ func (ms *MemStorage) GetBookById(bid string) (models.Book, error) {
 	return models.Book{}, ErrBookNotFound
 }
 
-func (ms *MemStorage) GetBookByUid(bid string) ([]models.Book, error) {
+func (ms *MemStorage) GetBookByUID(_ string) ([]models.Book, error) {
 	return []models.Book{}, nil
 }
 

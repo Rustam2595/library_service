@@ -4,6 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
 	"github.com/Rustam2595/library_service/internal/domain/models"
 	"github.com/Rustam2595/library_service/internal/storage"
 	"github.com/Rustam2595/library_service/mocks"
@@ -13,11 +19,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/crypto/bcrypt"
-	"log"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-	"time"
 )
 
 func TestRegisterHandler(t *testing.T) {
@@ -113,7 +114,6 @@ func TestRegisterHandler(t *testing.T) {
 				assert.NotEmpty(t, response.Header().Get("Authorization"))
 			}
 			assert.Equal(t, tc.want.statusCode, response.StatusCode())
-
 		})
 	}
 }
@@ -219,7 +219,6 @@ func TestAuthHandler(t *testing.T) {
 				assert.NotEmpty(t, response.Header().Get("Authorization"))
 			}
 			assert.Equal(t, tc.want.statusCode, response.StatusCode())
-
 		})
 	}
 }
@@ -291,7 +290,6 @@ func TestAllUserHandler(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
@@ -341,7 +339,7 @@ func TestDeleter(t *testing.T) {
 			m := mocks.NewMockStorage(ctrl)
 			defer ctrl.Finish()
 			m.EXPECT().DeleteBooks().Return(tc.want.err)
-			srv := New("0.0.0.0:8080", m)
+			srv := New("0.0.0.0:8080", m, nil, nil)
 			for i := 0; i < 2; i++ {
 				srv.deleteChan <- i
 			}
@@ -434,7 +432,6 @@ func TestUpdateUserHandler(t *testing.T) {
 			req.URL = fmt.Sprintf("%s/update_user/%s", httpSrv.URL, tc.uid) //httpSrv.URL + tc.request
 			req.Body = tc.requestBody
 			resp, err := req.Send()
-
 			//// 6. Создаём resty клиент
 			//client := resty.New()
 			//// 7. Формируем правильный URL с подстановкой ID
@@ -444,12 +441,10 @@ func TestUpdateUserHandler(t *testing.T) {
 			//	SetHeader("Content-Type", "application/json").
 			//	SetBody(tc.requestBody).
 			//	Put(url) // ✅ Правильный URL с реальным ID
-
 			log.Println(resp.String())
 			assert.NoError(t, err)
 			assert.Equal(t, tc.want.statusCode, resp.StatusCode())
 			assert.Contains(t, resp.String(), tc.want.expectedBody)
-
 		})
 	}
 }

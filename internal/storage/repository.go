@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/Rustam2595/library_service/internal/domain/models"
 	"github.com/Rustam2595/library_service/internal/logger"
 	"github.com/golang-migrate/migrate/v4"
@@ -13,8 +16,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/lib/pq"
-	"log"
-	"time"
 )
 
 const ctxTimeout = 2 * time.Second
@@ -37,7 +38,8 @@ func (r *Repository) SaveUser(user models.User) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 	UID := uuid.NewString()
-	_, err := r.conn.Exec(ctx, "INSERT INTO Users(uid, name, email, pass) VALUES($1, $2, $3, $4)", UID, user.Name, user.Email, user.Pass)
+	_, err := r.conn.Exec(ctx, "INSERT INTO Users(uid, name, email, pass) VALUES($1, $2, $3, $4)",
+		UID, user.Name, user.Email, user.Pass)
 	if err != nil {
 		return "", err
 	}
@@ -47,7 +49,8 @@ func (r *Repository) SaveUser(user models.User) (string, error) {
 func (r *Repository) ValidateUser(user models.User) (string, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
-	row := r.conn.QueryRow(ctx, "SELECT uid, pass FROM Users WHERE email = $1 AND uid = $2 AND deleted_user = false", user.Email, user.UID)
+	row := r.conn.QueryRow(ctx, "SELECT uid, pass FROM Users WHERE email = $1 AND uid = $2 AND deleted_user = false",
+		user.Email, user.UID)
 	var pass, uid string
 	if err := row.Scan(&uid, &pass); err != nil {
 		return "", "", ErrUserNotFound
@@ -82,7 +85,9 @@ func (r *Repository) GetUsers() ([]models.User, error) {
 func (r *Repository) UpdateUser(uid string, user models.User) error {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
-	_, err := r.conn.Exec(ctx, "UPDATE Users SET name = $1, email = $2, pass = $3 WHERE uid = $4 AND deleted_user = false", user.Name, user.Email, user.Pass, uid)
+	_, err := r.conn.Exec(ctx,
+		"UPDATE Users SET name = $1, email = $2, pass = $3 WHERE uid = $4 AND deleted_user = false",
+		user.Name, user.Email, user.Pass, uid)
 	if err != nil {
 		return ErrUserNotFound
 	}
@@ -96,8 +101,14 @@ func (r *Repository) DeleteUser(uid string) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer transaction.Rollback(ctx)
-	if _, err := transaction.Prepare(ctx, "update user", "UPDATE Users SET deleted_user = true WHERE uid = $1"); err != nil {
+	defer func() {
+		if err = transaction.Rollback(ctx); err != nil {
+			return
+		}
+	}()
+	if _, err = transaction.Prepare(ctx,
+		"update user",
+		"UPDATE Users SET deleted_user = true WHERE uid = $1"); err != nil {
 		return err
 	}
 	result, err := transaction.Exec(ctx, "update user", uid)
@@ -138,7 +149,7 @@ func (r *Repository) GetBooks() ([]models.Book, error) {
 	var books []models.Book
 	for rows.Next() {
 		var book models.Book
-		if err := rows.Scan(&book.BID, &book.Label, &book.Author, &book.Deleted, &book.UserUid, &book.CreatedAt); err != nil {
+		if err := rows.Scan(&book.BID, &book.Label, &book.Author, &book.Deleted, &book.UserUID, &book.CreatedAt); err != nil {
 			return nil, err
 		}
 		books = append(books, book)
@@ -149,12 +160,12 @@ func (r *Repository) GetBooks() ([]models.Book, error) {
 	return books, nil
 }
 
-func (r *Repository) GetBookById(bid string) (models.Book, error) {
+func (r *Repository) GetBookByID(bid string) (models.Book, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 	row := r.conn.QueryRow(ctx, "SELECT * FROM Books WHERE bid = $1", bid)
 	var book models.Book
-	if err := row.Scan(&book.BID, &book.Label, &book.Author, &book.Deleted, &book.UserUid, &book.CreatedAt); err != nil {
+	if err := row.Scan(&book.BID, &book.Label, &book.Author, &book.Deleted, &book.UserUID, &book.CreatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return models.Book{}, fmt.Errorf("book with id = %s, does not exist", bid)
 		}
@@ -166,10 +177,11 @@ func (r *Repository) GetBookById(bid string) (models.Book, error) {
 	return book, nil
 }
 
-func (r *Repository) GetBookByUid(uid string) ([]models.Book, error) {
+func (r *Repository) GetBookByUID(uid string) ([]models.Book, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
-	rows, err := r.conn.Query(ctx, "SELECT bid,label,author,deleted,user_uid,created_at FROM Books WHERE deleted = false AND user_uid = $1", uid)
+	rows, err := r.conn.Query(ctx,
+		"SELECT bid,label,author,deleted,user_uid,created_at FROM Books WHERE deleted = false AND user_uid = $1", uid)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +189,8 @@ func (r *Repository) GetBookByUid(uid string) ([]models.Book, error) {
 	//books := make([]models.Book, 0)
 	//for rows.Next() {
 	//	var book models.Book
-	//	if err := rows.Scan(&book.BID, &book.Label, &book.Author, &book.Deleted, &book.UserUid, &book.CreatedAt); err != nil {
+	//	if err := rows.Scan(&book.BID, &book.Label, &book.Author, &book.Deleted, &book.UserUID, &book.CreatedAt);
+	//	err != nil {
 	//		return nil, err
 	//	}
 	//	books = append(books, book)
@@ -199,7 +212,8 @@ func (r *Repository) GetBookByUid(uid string) ([]models.Book, error) {
 func (r *Repository) SaveBook(book models.Book) error {
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
-	_, err := r.conn.Exec(ctx, "INSERT INTO Books VALUES($1, $2, $3, $4, $5, $6)", uuid.NewString(), book.Label, book.Author, book.Deleted, book.UserUid, time.Now())
+	_, err := r.conn.Exec(ctx, "INSERT INTO Books VALUES($1, $2, $3, $4, $5, $6)",
+		uuid.NewString(), book.Label, book.Author, book.Deleted, book.UserUID, time.Now())
 	if err != nil {
 		return err
 	}
@@ -207,15 +221,21 @@ func (r *Repository) SaveBook(book models.Book) error {
 }
 
 func (r *Repository) DeleteBook(bid string) error {
-	log := logger.Get()
+	zLog := logger.Get()
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 	transaction, err := r.conn.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer transaction.Rollback(ctx)
-	if _, err := transaction.Prepare(ctx, "update book", "UPDATE Books SET deleted = true WHERE bid = $1"); err != nil {
+	defer func() {
+		if err = transaction.Rollback(ctx); err != nil {
+			return
+		}
+	}()
+	if _, err = transaction.Prepare(ctx,
+		"update book",
+		"UPDATE Books SET deleted = true WHERE bid = $1"); err != nil {
 		return err
 	}
 	result, err := transaction.Exec(ctx, "update book", bid)
@@ -225,7 +245,7 @@ func (r *Repository) DeleteBook(bid string) error {
 	if result.RowsAffected() == 0 {
 		return ErrBookNotFound
 	}
-	log.Debug().Msgf("book id = %s, deleted = %t", bid, true)
+	zLog.Debug().Msgf("book id = %s, deleted = %t", bid, true)
 
 	if err := transaction.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
@@ -234,16 +254,16 @@ func (r *Repository) DeleteBook(bid string) error {
 }
 
 func (r *Repository) DeleteBooks() error {
-	log := logger.Get()
+	zLog := logger.Get()
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
 	defer cancel()
 	res, err := r.conn.Exec(ctx, "DELETE FROM Books WHERE deleted = true")
 	if err != nil {
-		log.Error().Err(err).Msg("deleted books failed")
+		zLog.Error().Err(err).Msg("deleted books failed")
 		return err
 	}
 	deletedCount := res.RowsAffected()
-	log.Debug().Msgf("%d books deleted!", deletedCount)
+	zLog.Debug().Msgf("%d books deleted!", deletedCount)
 	return nil
 }
 
@@ -254,7 +274,7 @@ func Migrations(dbAddr, migrationsPath string) error {
 		return fmt.Errorf("could not create migrate instance: %w", err)
 	}
 	// Применение всех миграций
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("could not run migrations: %w", err)
 	}
 	log.Println("Migrations successfully created")
